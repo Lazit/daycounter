@@ -66,14 +66,12 @@
         확인
       </button>
     </div>
-    
+    <!-- 일정 리스트 -->
+    <div id="eventList" class="bg-gray-50 p-4 rounded-lg shadow-inner min-h-[200px] max-h-[400px] overflow-y-auto"></div>
     <!-- 초기화 버튼 -->
     <button id="resetList" class="w-full bg-gradient-to-r from-red-500 to-red-600 text-white py-3 px-4 rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-300 mb-6">
       🗑️ 전체 초기화
     </button>
-    
-    <!-- 일정 리스트 -->
-    <div id="eventList" class="bg-gray-50 p-4 rounded-lg shadow-inner min-h-[200px] max-h-[400px] overflow-y-auto"></div>
   </div>
 
   <script>
@@ -109,11 +107,11 @@
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         let message = '';
         if (diffDays > 0) {
-          message = `⏳ ${diffDays}일 남음`;
+          message = `${diffDays}일 남음`;
         } else if (diffDays < 0) {
-          message = `✅ ${Math.abs(diffDays)}일 지남`;
+          message = `${Math.abs(diffDays)}일 지남`;
         } else {
-          message = `🎉 오늘`;
+          message = `오늘`;
         }
 
         eventItem.innerHTML = `
