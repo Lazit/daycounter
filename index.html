@@ -1,0 +1,185 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row =>
+                    row.some(cell => cell !== '' && cell !== null && cell !== undefined)
+                );
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>데이카운터</title>
+  <link rel="manifest" href="manifest.json">
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js');
+    }
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes slideIn {
+      from { transform: translateY(-10px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .animate-slide-in {
+      animation: slideIn 0.3s ease-out;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-b from-blue-50 to-gray-100 flex flex-col items-center min-h-screen p-4 font-sans">
+  <div class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md">
+    <h1 class="text-3xl font-bold text-center text-blue-700 mb-6">데이카운터</h1>
+    
+    <!-- 일정 추가 버튼 -->
+    <button id="addEvent" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-4 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-300 mb-4">
+      📅 일정 추가
+    </button>
+    
+    <!-- 날짜 선택 입력 -->
+    <div id="datePicker" class="hidden mb-6">
+      <input type="date" id="eventDate" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none">
+      <button id="submitDate" class="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-3 px-4 rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-300 mt-2">
+        확인
+      </button>
+    </div>
+    
+    <!-- 초기화 버튼 -->
+    <button id="resetList" class="w-full bg-gradient-to-r from-red-500 to-red-600 text-white py-3 px-4 rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-300 mb-6">
+      🗑️ 전체 초기화
+    </button>
+    
+    <!-- 일정 리스트 -->
+    <div id="eventList" class="bg-gray-50 p-4 rounded-lg shadow-inner min-h-[200px] max-h-[400px] overflow-y-auto"></div>
+  </div>
+
+  <script>
+    const addEventBtn = document.getElementById('addEvent');
+    const datePicker = document.getElementById('datePicker');
+    const submitDateBtn = document.getElementById('submitDate');
+    const eventDateInput = document.getElementById('eventDate');
+    const eventList = document.getElementById('eventList');
+    const resetListBtn = document.getElementById('resetList');
+    let events = JSON.parse(localStorage.getItem('events')) || [];
+
+    // 최대 일정 개수
+    const MAX_EVENTS = 30;
+
+    // 일정 렌더링
+    function renderEvents() {
+      eventList.innerHTML = '';
+      if (events.length === 0) {
+        eventList.innerHTML = `
+          <div class="text-center text-gray-500 py-8">
+            <p class="text-lg">일정이 없습니다.</p>
+            <p class="text-sm">위의 '일정 추가' 버튼을 눌러 시작하세요!</p>
+          </div>
+        `;
+        return;
+      }
+
+      events.forEach((event, index) => {
+        const eventItem = document.createElement('div');
+        eventItem.className = 'bg-white p-4 rounded-lg shadow-md flex justify-between items-center mb-3 animate-slide-in';
+        
+        const diffTime = new Date(event.date) - new Date();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        let message = '';
+        if (diffDays > 0) {
+          message = `⏳ ${diffDays}일 남음`;
+        } else if (diffDays < 0) {
+          message = `✅ ${Math.abs(diffDays)}일 지남`;
+        } else {
+          message = `🎉 오늘`;
+        }
+
+        eventItem.innerHTML = `
+          <div class="flex items-center">
+            <span class="text-blue-500 mr-2">📅</span>
+            <div>
+              <p class="font-semibold text-gray-800">${event.date}</p>
+              <p class="text-sm text-gray-600">${message}</p>
+            </div>
+          </div>
+          <button class="delete-btn bg-red-500 text-white py-1 px-3 rounded-lg hover:bg-red-600 transition-all duration-200" data-index="${index}">
+            삭제
+          </button>
+        `;
+        eventList.prepend(eventItem);
+      });
+
+      // 삭제 버튼 이벤트
+      document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const index = btn.getAttribute('data-index');
+          events.splice(index, 1);
+          localStorage.setItem('events', JSON.stringify(events));
+          renderEvents();
+        });
+      });
+    }
+
+    // 초기 렌더링
+    renderEvents();
+
+    // 일정 추가 버튼
+    addEventBtn.addEventListener('click', () => {
+      if (events.length >= MAX_EVENTS) {
+        alert(`최대 ${MAX_EVENTS}개의 일정만 추가할 수 있습니다.`);
+        return;
+      }
+      datePicker.classList.toggle('hidden');
+    });
+
+    // 날짜 제출
+    submitDateBtn.addEventListener('click', () => {
+      const selectedDate = eventDateInput.value;
+      if (!selectedDate) {
+        alert('날짜를 선택하세요.');
+        return;
+      }
+
+      events.unshift({ date: selectedDate });
+      if (events.length > MAX_EVENTS) {
+        events.pop();
+      }
+      localStorage.setItem('events', JSON.stringify(events));
+      renderEvents();
+      datePicker.classList.add('hidden');
+      eventDateInput.value = '';
+    });
+
+    // 초기화 버튼
+    resetListBtn.addEventListener('click', () => {
+      if (confirm('모든 일정을 삭제하시겠습니까?')) {
+        events = [];
+        localStorage.setItem('events', JSON.stringify(events));
+        renderEvents();
+      }
+    });
+  </script>
+</body>
+</html>
